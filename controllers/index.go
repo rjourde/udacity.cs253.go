@@ -1,10 +1,11 @@
 package controllers
 
 import (
-    "fmt"
+    "html/template"
     "net/http"
 )
 
 func index(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprint(w, "Hello, Udacity!")
+    t, _ := template.ParseFiles("templates/index.html")
+    t.Execute(w, nil)
 }
