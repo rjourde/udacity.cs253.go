@@ -3,16 +3,14 @@ package controllers
 import (
 	"html/template"
 	"net/http"
+	"regexp"
 )
 
-type User struct {
+type SignupForm struct {
 	Username string
 	Password string
 	Verify string 
 	Email string
-}
-
-type Error struct {
 	ErrorUsername string
 	ErrorPassword string
 	ErrorVerify string
@@ -51,39 +49,77 @@ func rot13(b byte) byte {
 }
 
 func unit2Signup(w http.ResponseWriter, r *http.Request) {
-	// Get form field values
-	username := r.FormValue("username")
-	password := r.FormValue("password")
-	verify := r.FormValue("verify")
-	email := r.FormValue("email")
+	form := new(SignupForm)
 	
-	u := new(User)
-	
-	// Validate form fields
-	if ! (validUsername(username) && validPassword(password) && validEmail(email)) {
+	if r.Method == "GET" {
+		writeForm(w, form)	
+	}
+	if r.Method == "POST" {
+		// Get form field values
+		form.Username = r.FormValue("username")
+		form.Password = r.FormValue("password")
+		form.Verify = r.FormValue("verify")
+		form.Email = r.FormValue("email")
 		
-		t, _ := template.ParseFiles("templates/signup.html")
-		err := t.Execute(w, u)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}	
-	}else {
-		t, _ := template.ParseFiles("templates/welcome.html")
-		err := t.Execute(w, u)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		// Validate form fields
+		if ! (validUsername(form.Username) && validPassword(form.Password) && (form.Password == form.Verify) && validEmail(form.Email)) {
+			if !validUsername(form.Username) {
+				form.ErrorUsername = "That's not a valid username"
+			}
+			if !validPassword(form.Password) {
+				form.ErrorPassword = "That's not a valid password"
+			}
+			if(form.Password != form.Verify) {
+				form.ErrorVerify = "Your passwords didn't match"
+			}
+			if !validEmail(form.Email) {
+				form.ErrorEmail = "That's not a valid email"
+			}
+			
+			form.Password = ""
+			form.Verify = ""
+			
+			writeForm(w, form)	
+		}else {
+			http.Redirect(w, r, "/unit2/welcome?username="+form.Username, http.StatusFound)
+			return
 		}
 	}
 }
 
-func validUsername(string) bool {
-	return true
+func unit2Welcome(w http.ResponseWriter, r *http.Request) {
+	// get 'username' parameter
+	parameter := r.FormValue("username")
+	
+	t, _ := template.ParseFiles("templates/welcome.html")
+	err := t.Execute(w, parameter)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-func validPassword(string) bool {
-	return true
+func writeForm(w http.ResponseWriter, form *SignupForm) {
+	t, _ := template.ParseFiles("templates/signup.html")
+	err := t.Execute(w, form)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
-func validEmail(string) bool {
-	return true
+func validUsername(username string) bool {
+	valid := regexp.MustCompile(`^[a-zA-Z0-9_-]{3,20}$`)
+
+	return valid.MatchString(username)
+}
+
+func validPassword(password string) bool {
+	valid := regexp.MustCompile(`^.{3,20}$`)
+
+	return valid.MatchString(password)
+}
+
+func validEmail(email string) bool {
+	valid := regexp.MustCompile(`^[\S]+@[\S]+\.[\S]+$`)
+
+	return valid.MatchString(email)
 }
