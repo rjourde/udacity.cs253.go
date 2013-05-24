@@ -8,4 +8,5 @@ func init() {
 	http.HandleFunc("/unit2/rot13", unit2Rot13)
 	http.HandleFunc("/unit2/signup", unit2Signup)
 	http.HandleFunc("/unit2/welcome", unit2Welcome)
+	http.HandleFunc("/unit3/asciichan", unit3AsciiChan)
 }
