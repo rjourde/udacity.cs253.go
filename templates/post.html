@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>CS 253 Blog</title>
+		<link type="text/css" rel="stylesheet" href="/static/stylesheets/main.css" />
+	</head>
+	<body>
+		<div class="post">
+		  <div class="post-heading">
+			<div class="post-title">
+				<a href="/unit3/blog/{{.Key}}" class="post-link">{{.Subject}}</a>
+			</div>
+		
+			<div class="post-date">
+			  {{.Created}}
+			</div>
+		  </div>
+		
+		  <div class="post-content">
+			{{.Content}}
+		  </div>
+		</div>
+	</body>
+</html>

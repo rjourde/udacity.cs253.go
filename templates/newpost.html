@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>CS 253 Blog</title>
+		<link type="text/css" rel="stylesheet" href="/static/stylesheets/main.css" />
+	</head>
+	<body>
+		<a ref="/blog" class="main-title">CS 253 Blog</a>
+		<h1>new post</h1>
+
+		<form method="post">
+			<label>
+				<div>subject</div>
+					<input type="text" name="subject" value="{{.Subject}}">
+			</label>
+			<label>
+				<div>content</div>
+				<textarea name="content">{{.Content}}</textarea>
+			</label>
+
+			<div class="error">{{.Error}}</div>
+
+			<input type="submit">
+		</form>
+	</body>
+</html>
