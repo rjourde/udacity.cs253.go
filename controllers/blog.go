@@ -25,12 +25,13 @@ func blogFrontPage(w http.ResponseWriter, r *http.Request) {
 		q := datastore.NewQuery("Post").Order("-Created")
 		
 		var posts []*Post
-		if _, err := q.GetAll(c, &posts); err != nil {
+		keys, err := q.GetAll(c, &posts)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		
-		renderFrontPage(w, posts)
+		renderFrontPage(w, posts, keys)
 	}
 }
 
@@ -97,12 +98,23 @@ func blogViewPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	renderPostView(w, post)
+	renderPostView(w, post, intID)
 }
 
-func renderFrontPage(w http.ResponseWriter, posts []*Post) {
-	t, _ := template.ParseFiles("templates/blog.html")
-	err := t.Execute(w, posts)
+func renderFrontPage(w http.ResponseWriter, posts []*Post, keys []*datastore.Key) {
+	funcs := template.FuncMap{"postId": getPostId }
+	
+	t := template.Must(template.New("blog.html").Funcs(funcs).ParseFiles("templates/blog.html"))
+	
+	data := struct {
+		Posts []*Post
+		Keys []*datastore.Key
+	}{
+		posts,
+		keys,
+	}
+	
+	err := t.Execute(w, data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -118,13 +130,28 @@ func renderNewPostForm(w http.ResponseWriter, data interface{}) {
 	}
 }
 
-func renderPostView(w http.ResponseWriter, post Post) {
+func renderPostView(w http.ResponseWriter, post Post, intID int64) {
 	t, _ := template.ParseFiles("templates/post.html")
-	err := t.Execute(w, post)
+	
+	data := struct {
+		Post Post
+		IntID int64
+	}{
+		post,
+		intID,
+	}
+	
+	err := t.Execute(w, data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func getPostId(Keys []*datastore.Key, index int) string {
+	key := Keys[index]
+	
+	return fmt.Sprintf("%d", key.IntID())
 }
 
 

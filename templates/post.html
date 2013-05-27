@@ -8,16 +8,16 @@
 		<div class="post">
 		  <div class="post-heading">
 			<div class="post-title">
-				<a href="/unit3/blog/{{.Key}}" class="post-link">{{.Subject}}</a>
+				<a href="/unit3/blog/{{.IntID}}" class="post-link">{{.Post.Subject}}</a>
 			</div>
 		
 			<div class="post-date">
-			  {{.Created}}
+			  {{.Post.Created}}
 			</div>
 		  </div>
 		
 		  <div class="post-content">
-			{{.Content}}
+			{{.Post.Content}}
 		  </div>
 		</div>
 	</body>
