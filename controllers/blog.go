@@ -90,7 +90,6 @@ func blogViewPost(w http.ResponseWriter, r *http.Request) {
 	intID, _ := strconv.ParseInt(id, 10, 64)
 	// fetch the post from its ID
 	var post Post
-	
 	c := appengine.NewContext(r)
 	key := datastore.NewKey(c, "Post", "", intID, nil)
 	if err := datastore.Get(c, key, &post); err != nil {
@@ -102,7 +101,7 @@ func blogViewPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderFrontPage(w http.ResponseWriter, posts []*Post, keys []*datastore.Key) {
-	funcs := template.FuncMap{"postId": getPostId }
+	funcs := template.FuncMap{"postId": postId }
 	
 	t := template.Must(template.New("blog.html").Funcs(funcs).ParseFiles("templates/blog.html"))
 	
@@ -148,10 +147,9 @@ func renderPostView(w http.ResponseWriter, post Post, intID int64) {
 	}
 }
 
-func getPostId(Keys []*datastore.Key, index int) string {
+func postId(Keys []*datastore.Key, index int) string {
 	key := Keys[index]
 	
 	return fmt.Sprintf("%d", key.IntID())
 }
-
 

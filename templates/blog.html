@@ -5,15 +5,15 @@
 		<link type="text/css" rel="stylesheet" href="/static/stylesheets/main.css" />
 	</head>
 	<body>
-		<a ref="/blog" class="main-title">CS 253 Blog</a>
+		<a href="/unit3/blog" class="main-title">CS 253 Blog</a>
 		
 		<div id="content">
-			{{$i:=1}}
-			{{range .Posts}}
+			{{$keys := .Keys}}
+			{{range $index, $posts := .Posts}}
 				<div class="post">
 				  <div class="post-heading">
 					<div class="post-title">
-						<a href="/unit3/blog/{{postId .Keys $i}}" class="post-link">{{.Subject}}</a>
+						<a href="/unit3/blog/{{postId $keys $index}}" class="post-link">{{.Subject}}</a>
 					</div>
 				
 					<div class="post-date">
@@ -26,7 +26,6 @@
 				  </div>
 				</div>
 				<br><br>
-				{{$i++}}
 			{{end}}
 		</div>
 	</body>
