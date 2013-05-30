@@ -16,5 +16,7 @@ func init() {
 	r.HandleFunc("/unit3/blog", blogFrontPage)
 	r.HandleFunc("/unit3/blog/newpost", blogNewPost)
 	r.HandleFunc("/unit3/blog/{id:[0-9]+}", blogViewPost)
+	r.HandleFunc("/unit4/signup", unit4Signup)
+	r.HandleFunc("/unit4/welcome", unit4Welcome)
 	http.Handle("/", r)
 }

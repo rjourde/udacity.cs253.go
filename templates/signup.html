@@ -1,34 +1,34 @@
 <!DOCTYPE html>
 <html>
-<head>
-	<title>Unit2 Signup</title>
-	<style type="text/css">.label {text-align: right}.error {color: red}</style>
-</head>
-<body>
-<h2>Signup</h2>
-<form method="post">
-<table>
-	<tr>
-		<td class="label">Username</td>
-		<td><input type="text" name="username" value="{{.Username}}"></td>
-		<td class="error">{{.ErrorUsername}}</td>
-	</tr>
-	<tr>
-		<td class="label">Password</td>
-		<td><input type="password" name="password" value="{{.Password}}">
-		</td><td class="error">{{.ErrorPassword}}</td>
-	</tr>
-	<tr>
-		<td class="label">Verify Password</td>
-		<td><input type="password" name="verify" value="{{.Verify}}"></td>
-		<td class="error">{{.ErrorVerify}}</td>
-	</tr>
-	<tr>
-		<td class="label">Email (optional)</td>
-		<td><input type="text" name="email" value="{{.Email}}"></td>
-		<td class="error">{{.ErrorEmail}}</td></tr>
-</table>
-<input type="submit">
-</form>
-</body>
+	<head>
+		<title>Signup</title>
+		<style type="text/css">.label {text-align: right}.error {color: red}</style>
+	</head>
+	<body>
+		<h2>Signup</h2>
+		<form method="post">
+			<table>
+				<tr>
+					<td class="label">Username</td>
+					<td><input type="text" name="username" value="{{.Username}}"></td>
+					<td class="error">{{.ErrorUsername}}</td>
+				</tr>
+				<tr>
+					<td class="label">Password</td>
+					<td><input type="password" name="password" value="{{.Password}}">
+					</td><td class="error">{{.ErrorPassword}}</td>
+				</tr>
+				<tr>
+					<td class="label">Verify Password</td>
+					<td><input type="password" name="verify" value="{{.Verify}}"></td>
+					<td class="error">{{.ErrorVerify}}</td>
+				</tr>
+				<tr>
+					<td class="label">Email (optional)</td>
+					<td><input type="text" name="email" value="{{.Email}}"></td>
+					<td class="error">{{.ErrorEmail}}</td></tr>
+			</table>
+			<input type="submit">
+		</form>
+	</body>
 </html>
