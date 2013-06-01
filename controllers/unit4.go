@@ -7,6 +7,8 @@ import (
     "appengine/datastore"
 	"time"
 	"github.com/gorilla/securecookie"
+	"fmt"
+	"strconv"
 )
 
 type User struct {
@@ -88,7 +90,7 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 		} else {
 			user := userByUsername(r, username)
 			
-			if(user != nil) {
+			if(len(user.Username) > 0) {
 				errorUsername = "That user already exists"
 				
 				form := struct {
@@ -118,15 +120,16 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 				u := User{ username, password, verify, email, time.Now() }
 				key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "User", nil), &u)
 
-				userIdCookie = securecookie.New(makeSalt(), makeSalt())
+				userIdCookie = securecookie.New(securecookie.GenerateRandomKey(32), nil)
 				
-				storeCookie(w, r, "user_id", key.StringID())
+				stringID := fmt.Sprintf("%d", key.IntID())
+				storeCookie(w, r, "user_id", stringID)
 				
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				// redirect to the page of the newly created post
+				// redirect to the page of the newly registered user
 				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
 				return
 			}
@@ -134,8 +137,8 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func userByUsername(r *http.Request,username string) *User {
-	var user *User
+func userByUsername(r *http.Request,username string) User {
+	var user User
 	
 	c := appengine.NewContext(r)
 	q:= datastore.NewQuery("User").Filter("Username =", username)
@@ -145,7 +148,6 @@ func userByUsername(r *http.Request,username string) *User {
 				break
 		}
 	}
-	
 	return user
 }
 
@@ -153,7 +155,7 @@ func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue
 	value := map[string]string{
         cookieName : cookieValue,
     }
-    if encoded, err := userIdCookie.Encode(cookieValue, value); err == nil {
+    if encoded, err := userIdCookie.Encode(cookieName, value); err == nil {
         cookie := &http.Cookie{
             Name:  cookieName,
             Value: encoded,
@@ -164,22 +166,12 @@ func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue
 }
 
 func fetchCookie(c appengine.Context, r *http.Request, cookieName string) string{
-	// read the secure cookie
-	cookie, err := r.Cookie(cookieName)
-	c.Debugf("cookieName : %s", cookieName)
-	c.Debugf("cookie : %v", cookie)
-	c.Debugf("cookie.Value : %v", cookie.Value)
-	
-	if err == nil {
+	if cookie, err := r.Cookie(cookieName); err == nil {
 		value := make(map[string]string)
 		err = userIdCookie.Decode(cookieName, cookie.Value, &value)
         if err == nil {
-			c.Debugf("cookie.Value : %s", cookie.Value)
-			c.Debugf("value[cookieName] : %s", value[cookieName])
             return value[cookieName]
-        } else {
-			c.Debugf("ERROR : %s", err.Error())
-		}
+        }
     }
 	
 	return ""
@@ -189,33 +181,22 @@ func unit4Welcome(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// read the secure cookie
 	if userId := fetchCookie(c, r, "user_id"); len(userId) > 0 {
-		c.Debugf("UserID: %v", userId)
-		var user *User
+		var user User
+		intID, _ := strconv.ParseInt(userId, 10, 64)
+		key := datastore.NewKey(c, "User", "", intID, nil)
 		
-		key := datastore.NewKey(c, "User", userId, 0, nil)
 		if err := datastore.Get(c, key, &user); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		
-		var username string = "Nobody"
-		
-		if(user != nil) {
-			username = user.Username
-		}
-		
 		t, _ := template.ParseFiles("templates/welcome.html")
-		err := t.Execute(w, username)
+		err := t.Execute(w, user.Username)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-	} else {
-		c.Debugf("Nobody")
 	}
 }
 
-func makeSalt() []byte {
-	return securecookie.GenerateRandomKey(32)
-}
 
 
