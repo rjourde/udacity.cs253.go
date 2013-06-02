@@ -43,13 +43,13 @@ func jsonBlogFrontPage(w http.ResponseWriter, r *http.Request) {
 		q := datastore.NewQuery("Post").Order("-Created")
 
 		var posts []*Post
-		keys, err := q.GetAll(c, &posts)
+		_, err := q.GetAll(c, &posts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		renderJsonFrontPage(w, posts, keys)
+		renderJsonFrontPage(w, posts)
 	}
 }
 
@@ -154,8 +154,21 @@ func renderFrontPage(w http.ResponseWriter, posts []*Post, keys []*datastore.Key
 	}
 }
 
-func renderJsonFrontPage(w http.ResponseWriter, posts []*Post, keys []*datastore.Key) {
-
+func renderJsonFrontPage(w http.ResponseWriter, posts []*Post) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	
+	data := make([]JsonResponse, len(posts))
+	
+	for index, post := range posts {
+		response := JsonResponse {
+			"subject": post.Subject,
+			"content": post.Content,
+			"created": post.Created.String(),
+		}
+		data[index] = response
+	}
+	 
+	fmt.Fprint(w, data)
 }
 
 func renderNewPostForm(w http.ResponseWriter, data interface{}) {
@@ -188,7 +201,13 @@ func renderPostView(w http.ResponseWriter, post Post, intID int64) {
 func renderJsonPostView(w http.ResponseWriter, post Post) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	
-	fmt.Fprint(w, post)
+	data := JsonResponse {
+		"subject": post.Subject,
+		"content": post.Content,
+		"created": post.Created.String(),
+	} 
+	
+	fmt.Fprint(w, data)
 }
 
 func postId(Keys []*datastore.Key, index int) string {
@@ -200,11 +219,11 @@ func postId(Keys []*datastore.Key, index int) string {
 type JsonResponse map[string]interface{}
 
 func (r JsonResponse) String() (s string) {
-		b, err := json.Marshal(r)
-		if err != nil {
-				s = ""
-				return
-		}
-		s = string(b)
-		return
+	b, err := json.Marshal(r)
+	if err != nil {
+			s = ""
+			return
+	}
+	s = string(b)
+	return
 }
