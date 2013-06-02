@@ -19,6 +19,7 @@ type User struct {
 	Created time.Time
 }
 
+var secret []byte = securecookie.GenerateRandomKey(32)
 var userIdCookie *securecookie.SecureCookie
 
 func unit4Signup(w http.ResponseWriter, r *http.Request) {
@@ -119,16 +120,16 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 				
 				u := User{ username, password, verify, email, time.Now() }
 				key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "User", nil), &u)
-
-				userIdCookie = securecookie.New(securecookie.GenerateRandomKey(32), nil)
-				
-				stringID := fmt.Sprintf("%d", key.IntID())
-				storeCookie(w, r, "user_id", stringID)
-				
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
+
+				userIdCookie = securecookie.New(secret, nil)
+				
+				stringID := fmt.Sprintf("%d", key.IntID())
+				storeCookie(w, r, "user_id", stringID)
+				
 				// redirect to the page of the newly registered user
 				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
 				return
@@ -137,7 +138,57 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func userByUsername(r *http.Request,username string) User {
+func unit4Login(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method == "GET" {
+		form := struct {
+			Username string
+			Password string
+			ErrorLogin string
+		}{
+			"", "", "",
+		}
+		writeLoginForm(w, form)	
+	}
+	if r.Method == "POST" {
+		// Get form field values
+		username := r.FormValue("username")
+		password := r.FormValue("password")
+		
+		// Validate form fields
+		userID, user := userByUsernameAndPassword(r, username, password)
+		c := appengine.NewContext(r)
+		c.Debugf("userID : %d", userID)
+		c.Debugf("user : %q", user)
+		if(userID != 0 && len(user.Username) > 0) {
+			if(username == user.Username && password == user.Password) {
+				if(userIdCookie == nil){
+					userIdCookie = securecookie.New(secret, nil)
+				}
+				stringID := fmt.Sprintf("%d", userID)
+				storeCookie(w, r, "user_id", stringID)
+				
+				// redirect to the welcome page
+				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
+				return
+			}
+		}
+		
+		form := struct {
+			Username string
+			Password string
+			ErrorLogin string
+		}{
+			username,
+			password,
+			"Invalid Login",
+		}
+		
+		writeLoginForm(w, form)
+	}
+}
+
+func userByUsername(r *http.Request, username string) User {
 	var user User
 	
 	c := appengine.NewContext(r)
@@ -149,6 +200,22 @@ func userByUsername(r *http.Request,username string) User {
 		}
 	}
 	return user
+}
+
+func userByUsernameAndPassword(r *http.Request, username, password string) (int64, *User) {
+	var users []*User
+
+	c := appengine.NewContext(r)
+	// Fetch the user
+	q:= datastore.NewQuery("User").Filter("Username =", username).Filter("Password =", password)
+	keys, err := q.GetAll(c, &users)
+	if err != nil {
+		return 0, nil
+	}
+	if(keys == nil || users == nil) {
+		return 0, nil
+	}
+	return keys[0].IntID(), users[0]
 }
 
 func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue string) {
@@ -165,7 +232,7 @@ func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue
     }
 }
 
-func fetchCookie(c appengine.Context, r *http.Request, cookieName string) string{
+func fetchCookie(c appengine.Context, r *http.Request, cookieName string) string {
 	if cookie, err := r.Cookie(cookieName); err == nil {
 		value := make(map[string]string)
 		err = userIdCookie.Decode(cookieName, cookie.Value, &value)
