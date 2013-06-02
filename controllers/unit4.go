@@ -188,9 +188,43 @@ func unit4Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func unit4Logout(w http.ResponseWriter, r *http.Request) {
+	clearCookie(w, "user_id")
+	// redirect to the signup
+	http.Redirect(w, r, "/unit4/signup", http.StatusFound)
+	return
+}
+
+func unit4Welcome(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	// read the secure cookie
+	if userId := fetchCookie(r, "user_id"); len(userId) > 0 {
+		var user User
+		intID, _ := strconv.ParseInt(userId, 10, 64)
+		key := datastore.NewKey(c, "User", "", intID, nil)
+		
+		if err := datastore.Get(c, key, &user); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		
+		t, _ := template.ParseFiles("templates/welcome.html")
+		err := t.Execute(w, user.Username)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		// redirect to the signup
+		http.Redirect(w, r, "/unit4/signup", http.StatusFound)
+		return
+	}
+}
+
+// User util methods
+
 func userByUsername(r *http.Request, username string) User {
 	var user User
-	
+
 	c := appengine.NewContext(r)
 	q:= datastore.NewQuery("User").Filter("Username =", username)
 	for t := q.Run(c); ; {
@@ -201,6 +235,7 @@ func userByUsername(r *http.Request, username string) User {
 	}
 	return user
 }
+
 
 func userByUsernameAndPassword(r *http.Request, username, password string) (int64, *User) {
 	var users []*User
@@ -218,51 +253,43 @@ func userByUsernameAndPassword(r *http.Request, username, password string) (int6
 	return keys[0].IntID(), users[0]
 }
 
+// Cookie util methods
+
 func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue string) {
 	value := map[string]string{
-        cookieName : cookieValue,
-    }
-    if encoded, err := userIdCookie.Encode(cookieName, value); err == nil {
-        cookie := &http.Cookie{
-            Name:  cookieName,
-            Value: encoded,
-            Path:  "/",
-        }
-        http.SetCookie(w, cookie)
-    }
+		cookieName : cookieValue,
+	}
+	if encoded, err := userIdCookie.Encode(cookieName, value); err == nil {
+		cookie := &http.Cookie{
+			Name:  cookieName,
+			Value: encoded,
+			Path:  "/",
+		}
+		http.SetCookie(w, cookie)
+	}
 }
 
-func fetchCookie(c appengine.Context, r *http.Request, cookieName string) string {
+func fetchCookie(r *http.Request, cookieName string) string {
 	if cookie, err := r.Cookie(cookieName); err == nil {
 		value := make(map[string]string)
-		err = userIdCookie.Decode(cookieName, cookie.Value, &value)
-        if err == nil {
-            return value[cookieName]
-        }
-    }
-	
+		if(userIdCookie != nil) {
+			err = userIdCookie.Decode(cookieName, cookie.Value, &value)
+			if (len(value[cookieName]) > 0 && err == nil) {
+				return value[cookieName]
+			}
+		}
+	}
+
 	return ""
 }
 
-func unit4Welcome(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	// read the secure cookie
-	if userId := fetchCookie(c, r, "user_id"); len(userId) > 0 {
-		var user User
-		intID, _ := strconv.ParseInt(userId, 10, 64)
-		key := datastore.NewKey(c, "User", "", intID, nil)
-		
-		if err := datastore.Get(c, key, &user); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		
-		t, _ := template.ParseFiles("templates/welcome.html")
-		err := t.Execute(w, user.Username)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
+func clearCookie(w http.ResponseWriter, cookieName string) {
+	cookie := &http.Cookie{
+		Name:  cookieName,
+		Value: "",
+		Path:  "/",
 	}
+	http.SetCookie(w, cookie)
 }
 
 
