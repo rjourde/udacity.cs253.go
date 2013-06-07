@@ -8,12 +8,11 @@
 		<a href="/blog" class="main-title">CS 253 Blog</a>
 		
 		<div id="content">
-			{{$keys := .Keys}}
 			{{range $index, $posts := .Posts}}
 				<div class="post">
 				  <div class="post-heading">
 					<div class="post-title">
-						<a href="/blog/{{postId $keys $index}}" class="post-link">{{.Subject}}</a>
+						<a href="/blog/{{.Id}}" class="post-link">{{.Subject}}</a>
 					</div>
 				
 					<div class="post-date">

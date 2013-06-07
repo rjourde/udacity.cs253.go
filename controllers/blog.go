@@ -10,9 +10,11 @@ import (
 	"fmt"
 	"strconv"
 	"encoding/json"
+	"appengine/memcache"
 )
 
 type Post struct {
+	Id int64
 	Subject string
 	Content string
 	Created time.Time
@@ -22,17 +24,32 @@ func blogFrontPage(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		// Display all blog entries
-		c := appengine.NewContext(r)
-		q := datastore.NewQuery("Post").Order("-Created")
-		
 		var posts []*Post
-		keys, err := q.GetAll(c, &posts)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		// Get the item from the memcache
+		c := appengine.NewContext(r)
+		if err := memcache.Gob.Get(c, "posts", &post); err == memcache.ErrCacheMiss {
+			c := appengine.NewContext(r)
+			q := datastore.NewQuery("Post").Order("-Created")
+			
+			keys, err := q.GetAll(c, &posts)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			// Create an Item
+			item := &memcache.Item{
+				Key:   "posts",
+				Value: posts,
+			}
+			// Add the item to the memcache
+			if err := memcache.Gob.Set(c, item); err == memcache.ErrNotStored {
+				c.Infof("item with key %q already exists", item.Key)
+			} else if err != nil {
+				c.Errorf("error adding item: %v", err)
+			}
 		}
 		
-		renderFrontPage(w, posts, keys)
+		renderFrontPage(w, posts)
 	}
 }
 
@@ -86,15 +103,18 @@ func blogNewPost(w http.ResponseWriter, r *http.Request) {
 		} else {
 			// create new post
 			c := appengine.NewContext(r)
-			p := Post{ subject, content, time.Now() }
+			p := Post{ 0, subject, content, time.Now() }
 			
-			key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "Post", nil), &p)
+			key := datastore.NewIncompleteKey(c, "Post", nil)
+			p.Id = key.IntID()
+			
+			_, err := datastore.Put(c, key, &p)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			// redirect to the page of the newly created post
-			stringID := fmt.Sprintf("%d", key.IntID())
+			stringID := fmt.Sprintf("%d", p.Id)
 			http.Redirect(w, r, "/blog/" + stringID, http.StatusFound)
 			return
 		}
@@ -115,7 +135,7 @@ func blogViewPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	renderPostView(w, post, intID)
+	renderPostView(w, post)
 }
 
 func jsonBlogViewPost(w http.ResponseWriter, r *http.Request) {
@@ -134,21 +154,9 @@ func jsonBlogViewPost(w http.ResponseWriter, r *http.Request) {
 	renderJsonPostView(w, post)
 }
 
-func renderFrontPage(w http.ResponseWriter, posts []*Post, keys []*datastore.Key) {
-	funcs := template.FuncMap{"postId": postId }
-	
-	t := template.Must(template.New("blog.html").Funcs(funcs).ParseFiles("templates/blog.html"))
-	
-	data := struct {
-		Posts []*Post
-		Keys []*datastore.Key
-	}{
-		posts,
-		keys,
-	}
-	
-	err := t.Execute(w, data)
-	if err != nil {
+func renderFrontPage(w http.ResponseWriter, posts []*Post) {
+	t := template.ParseFiles("templates/blog.html")
+	if err := t.Execute(w, post); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -173,26 +181,15 @@ func renderJsonFrontPage(w http.ResponseWriter, posts []*Post) {
 
 func renderNewPostForm(w http.ResponseWriter, data interface{}) {
 	t, _ := template.ParseFiles("templates/newpost.html")
-	err := t.Execute(w, data)
-	if err != nil {
+	if err := t.Execute(w, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func renderPostView(w http.ResponseWriter, post Post, intID int64) {
+func renderPostView(w http.ResponseWriter, post Post) {
 	t, _ := template.ParseFiles("templates/post.html")
-	
-	data := struct {
-		Post Post
-		IntID int64
-	}{
-		post,
-		intID,
-	}
-	
-	err := t.Execute(w, data)
-	if err != nil {
+	if err := t.Execute(w, post); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -208,12 +205,6 @@ func renderJsonPostView(w http.ResponseWriter, post Post) {
 	} 
 	
 	fmt.Fprint(w, data)
-}
-
-func postId(Keys []*datastore.Key, index int) string {
-	key := Keys[index]
-	
-	return fmt.Sprintf("%d", key.IntID())
 }
 
 type JsonResponse map[string]interface{}
