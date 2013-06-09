@@ -27,25 +27,30 @@ func blogFrontPage(w http.ResponseWriter, r *http.Request) {
 		var posts []*Post
 		// Get the item from the memcache
 		c := appengine.NewContext(r)
-		if err := memcache.Gob.Get(c, "posts", &post); err == memcache.ErrCacheMiss {
+		if item, err := memcache.Get(c, "posts"); err == memcache.ErrCacheMiss {
 			c := appengine.NewContext(r)
 			q := datastore.NewQuery("Post").Order("-Created")
 			
-			keys, err := q.GetAll(c, &posts)
-			if err != nil {
+			if _, err := q.GetAll(c, &posts); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			// Encode posts
+			encodedPosts, _ := json.Marshal(posts)
 			// Create an Item
 			item := &memcache.Item{
 				Key:   "posts",
-				Value: posts,
+				Value: encodedPosts,
 			}
 			// Add the item to the memcache
-			if err := memcache.Gob.Set(c, item); err == memcache.ErrNotStored {
+			if err := memcache.Set(c, item); err == memcache.ErrNotStored {
 				c.Infof("item with key %q already exists", item.Key)
 			} else if err != nil {
 				c.Errorf("error adding item: %v", err)
+			}
+		}else {
+			if err := json.Unmarshal(item.Value, &posts); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}
 		
@@ -103,18 +108,31 @@ func blogNewPost(w http.ResponseWriter, r *http.Request) {
 		} else {
 			// create new post
 			c := appengine.NewContext(r)
-			p := Post{ 0, subject, content, time.Now() }
+			postID, _, _ := datastore.AllocateIDs(c, "Post", nil, 1)
+			key := datastore.NewKey(c, "Post", "", postID, nil)
 			
-			key := datastore.NewIncompleteKey(c, "Post", nil)
-			p.Id = key.IntID()
+			post := Post{ postID, subject, content, time.Now() }
 			
-			_, err := datastore.Put(c, key, &p)
+			_, err := datastore.Put(c, key, &post)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			// Encode post
+			encodedPost, _ := json.Marshal(post)
+			// Create an Item
+			item := &memcache.Item{
+				Key:   fmt.Sprintf("post%d", post.Id),
+				Value: encodedPost,
+			}
+			// Add the item to the memcache
+			if err := memcache.Set(c, item); err == memcache.ErrNotStored {
+				c.Infof("item with key %q already exists", item.Key)
+			} else if err != nil {
+				c.Errorf("error adding item: %v", err)
+			}
 			// redirect to the page of the newly created post
-			stringID := fmt.Sprintf("%d", p.Id)
+			stringID := fmt.Sprintf("%d", post.Id)
 			http.Redirect(w, r, "/blog/" + stringID, http.StatusFound)
 			return
 		}
@@ -125,14 +143,29 @@ func blogNewPost(w http.ResponseWriter, r *http.Request) {
 func blogViewPost(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id := vars["id"]
+	
+	c := appengine.NewContext(r)
+	
 	intID, _ := strconv.ParseInt(id, 10, 64)
 	// fetch the post from its ID
 	var post Post
-	c := appengine.NewContext(r)
 	key := datastore.NewKey(c, "Post", "", intID, nil)
 	if err := datastore.Get(c, key, &post); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	// encode the post
+	encodedPost, _ := json.Marshal(post)
+	// Create an Item
+	item := &memcache.Item{
+		Key:   fmt.Sprintf("post%d", post.Id),
+		Value: encodedPost,
+	}
+	// Add the item to the memcache
+	if err := memcache.Set(c, item); err == memcache.ErrNotStored {
+		c.Infof("item with key %q already exists", item.Key)
+	} else if err != nil {
+		c.Errorf("error adding item: %v", err)
 	}
 	
 	renderPostView(w, post)
@@ -155,8 +188,8 @@ func jsonBlogViewPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderFrontPage(w http.ResponseWriter, posts []*Post) {
-	t := template.ParseFiles("templates/blog.html")
-	if err := t.Execute(w, post); err != nil {
+	t, _ := template.ParseFiles("templates/blog.html")
+	if err := t.Execute(w, posts); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
