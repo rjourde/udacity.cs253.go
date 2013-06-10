@@ -1,22 +1,23 @@
 package controllers
 
 import (
-	"html/template"
 	"net/http"
 	"appengine"
-    "appengine/datastore"
+	"appengine/datastore"
 	"time"
-	"github.com/gorilla/securecookie"
 	"fmt"
-	"strconv"
+	"github.com/gorilla/securecookie"
 	"models"
 )
 
-var secret []byte = securecookie.GenerateRandomKey(32)
-var userIdCookie *securecookie.SecureCookie
+var wikiSecret []byte = securecookie.GenerateRandomKey(32)
+var wikiUserIdCookie *securecookie.SecureCookie
 
-func unit4Signup(w http.ResponseWriter, r *http.Request) {
-	
+func wikiFrontPage(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func wikiSignup(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		form := struct {
 			Username string
@@ -112,27 +113,26 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 				c := appengine.NewContext(r)
 				
 				u := models.User{ username, password, verify, email, time.Now() }
-				key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "User", nil), &u)
+				key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "WikiUser", nil), &u)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-
-				userIdCookie = securecookie.New(secret, nil)
+	
+				wikiUserIdCookie = securecookie.New(wikiSecret, nil)
 				
 				stringID := fmt.Sprintf("%d", key.IntID())
 				storeCookie(w, r, "user_id", stringID)
 				
-				// redirect to the page of the newly registered user
-				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
+				// redirect to the wiki front page
+				http.Redirect(w, r, "/wiki", http.StatusFound)
 				return
 			}
 		}
 	}
 }
 
-func unit4Login(w http.ResponseWriter, r *http.Request) {
-
+func wikiLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		form := struct {
 			Username string
@@ -152,14 +152,14 @@ func unit4Login(w http.ResponseWriter, r *http.Request) {
 		userID, user := models.UserByUsernameAndPassword(r, username, password)
 		if(userID != 0 && len(user.Username) > 0) {
 			if(username == user.Username && password == user.Password) {
-				if(userIdCookie == nil){
-					userIdCookie = securecookie.New(secret, nil)
+				if(wikiUserIdCookie == nil){
+					wikiUserIdCookie = securecookie.New(wikiSecret, nil)
 				}
 				stringID := fmt.Sprintf("%d", userID)
 				storeCookie(w, r, "user_id", stringID)
 				
-				// redirect to the welcome page
-				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
+				// redirect to the wiki front page
+				http.Redirect(w, r, "/wiki", http.StatusFound)
 				return
 			}
 		}
@@ -178,76 +178,21 @@ func unit4Login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func unit4Logout(w http.ResponseWriter, r *http.Request) {
+func wikiLogout(w http.ResponseWriter, r *http.Request) {
 	clearCookie(w, "user_id")
-	// redirect to the signup
-	http.Redirect(w, r, "/unit4/signup", http.StatusFound)
+	// redirect to the wiki front page
+	http.Redirect(w, r, "/wiki", http.StatusFound)
 	return
 }
 
-func unit4Welcome(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	// read the secure cookie
-	if userId := fetchCookie(r, "user_id"); len(userId) > 0 {
-		var user models.User
-		intID, _ := strconv.ParseInt(userId, 10, 64)
-		key := datastore.NewKey(c, "User", "", intID, nil)
-		
-		if err := datastore.Get(c, key, &user); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		
-		t, _ := template.ParseFiles("templates/welcome.html")
-		err := t.Execute(w, user.Username)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	} else {
-		// redirect to the signup
-		http.Redirect(w, r, "/unit4/signup", http.StatusFound)
-		return
-	}
+func wikiHistory(w http.ResponseWriter, r *http.Request) {
+
 }
 
-// Cookie util methods
+func wikiEdit(w http.ResponseWriter, r *http.Request) {
 
-func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue string) {
-	value := map[string]string{
-		cookieName : cookieValue,
-	}
-	if encoded, err := userIdCookie.Encode(cookieName, value); err == nil {
-		cookie := &http.Cookie{
-			Name:  cookieName,
-			Value: encoded,
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
-	}
 }
 
-func fetchCookie(r *http.Request, cookieName string) string {
-	if cookie, err := r.Cookie(cookieName); err == nil {
-		value := make(map[string]string)
-		if(userIdCookie != nil) {
-			err = userIdCookie.Decode(cookieName, cookie.Value, &value)
-			if (len(value[cookieName]) > 0 && err == nil) {
-				return value[cookieName]
-			}
-		}
-	}
+func wikiPage(w http.ResponseWriter, r *http.Request) {
 
-	return ""
 }
-
-func clearCookie(w http.ResponseWriter, cookieName string) {
-	cookie := &http.Cookie{
-		Name:  cookieName,
-		Value: "",
-		Path:  "/",
-	}
-	http.SetCookie(w, cookie)
-}
-
-
-

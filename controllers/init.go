@@ -22,5 +22,12 @@ func init() {
 	r.HandleFunc("/welcome", unit4Welcome)
 	r.HandleFunc("/blog.json", jsonBlogFrontPage)
 	r.HandleFunc("/blog/{id:[0-9]+}.json", jsonBlogViewPost)
+	r.HandleFunc("/wiki", wikiFrontPage)
+	r.HandleFunc("/wiki/signup", wikiSignup)
+	r.HandleFunc("/wiki/login", wikiLogin)
+	r.HandleFunc("/wiki/logout", wikiLogout)
+	r.HandleFunc("/wiki/_history", wikiHistory)
+	r.HandleFunc("/wiki/_edit", wikiEdit)
+	r.HandleFunc("/wiki/{id:[a-zA-Z0-9_-]+}", wikiPage)
 	http.Handle("/", r)
 }

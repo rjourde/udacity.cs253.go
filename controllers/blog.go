@@ -11,20 +11,14 @@ import (
 	"strconv"
 	"encoding/json"
 	"appengine/memcache"
+	"models"
 )
-
-type Post struct {
-	Id int64
-	Subject string
-	Content string
-	Created time.Time
-}
 
 func blogFrontPage(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == "GET" {
 		// Display all blog entries
-		var posts []*Post
+		var posts []*models.Post
 		// Get the item from the memcache
 		c := appengine.NewContext(r)
 		if item, err := memcache.Get(c, "posts"); err == memcache.ErrCacheMiss {
@@ -64,7 +58,7 @@ func jsonBlogFrontPage(w http.ResponseWriter, r *http.Request) {
 		c := appengine.NewContext(r)
 		q := datastore.NewQuery("Post").Order("-Created")
 
-		var posts []*Post
+		var posts []*models.Post
 		_, err := q.GetAll(c, &posts)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -111,7 +105,7 @@ func blogNewPost(w http.ResponseWriter, r *http.Request) {
 			postID, _, _ := datastore.AllocateIDs(c, "Post", nil, 1)
 			key := datastore.NewKey(c, "Post", "", postID, nil)
 			
-			post := Post{ postID, subject, content, time.Now() }
+			post := models.Post{ postID, subject, content, time.Now() }
 			
 			_, err := datastore.Put(c, key, &post)
 			if err != nil {
@@ -148,7 +142,7 @@ func blogViewPost(w http.ResponseWriter, r *http.Request) {
 	
 	intID, _ := strconv.ParseInt(id, 10, 64)
 	// fetch the post from its ID
-	var post Post
+	var post models.Post
 	key := datastore.NewKey(c, "Post", "", intID, nil)
 	if err := datastore.Get(c, key, &post); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -176,7 +170,7 @@ func jsonBlogViewPost(w http.ResponseWriter, r *http.Request) {
 	id := vars["id"]
 	intID, _ := strconv.ParseInt(id, 10, 64)
 	// fetch the post from its ID
-	var post Post
+	var post models.Post
 	c := appengine.NewContext(r)
 	key := datastore.NewKey(c, "Post", "", intID, nil)
 	if err := datastore.Get(c, key, &post); err != nil {
@@ -187,7 +181,7 @@ func jsonBlogViewPost(w http.ResponseWriter, r *http.Request) {
 	renderJsonPostView(w, post)
 }
 
-func renderFrontPage(w http.ResponseWriter, posts []*Post) {
+func renderFrontPage(w http.ResponseWriter, posts []*models.Post) {
 	t, _ := template.ParseFiles("templates/blog.html")
 	if err := t.Execute(w, posts); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -195,7 +189,7 @@ func renderFrontPage(w http.ResponseWriter, posts []*Post) {
 	}
 }
 
-func renderJsonFrontPage(w http.ResponseWriter, posts []*Post) {
+func renderJsonFrontPage(w http.ResponseWriter, posts []*models.Post) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	
 	data := make([]JsonResponse, len(posts))
@@ -220,7 +214,7 @@ func renderNewPostForm(w http.ResponseWriter, data interface{}) {
 	}
 }
 
-func renderPostView(w http.ResponseWriter, post Post) {
+func renderPostView(w http.ResponseWriter, post models.Post) {
 	t, _ := template.ParseFiles("templates/post.html")
 	if err := t.Execute(w, post); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -228,7 +222,7 @@ func renderPostView(w http.ResponseWriter, post Post) {
 	}
 }
 
-func renderJsonPostView(w http.ResponseWriter, post Post) {
+func renderJsonPostView(w http.ResponseWriter, post models.Post) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	
 	data := JsonResponse {
