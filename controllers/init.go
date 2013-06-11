@@ -28,6 +28,6 @@ func init() {
 	r.HandleFunc("/wiki/logout", wikiLogout)
 	r.HandleFunc("/wiki/_history", wikiHistory)
 	r.HandleFunc("/wiki/_edit", wikiEdit)
-	r.HandleFunc("/wiki/{id:[a-zA-Z0-9_-]+}", wikiPage)
+	r.HandleFunc("/wiki/{page:[a-zA-Z0-9_-]+}", wikiPage)
 	http.Handle("/", r)
 }

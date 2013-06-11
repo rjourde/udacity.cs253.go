@@ -1,11 +1,13 @@
 package controllers
 
 import (
+	"html/template"
 	"net/http"
 	"appengine"
 	"appengine/datastore"
 	"time"
 	"fmt"
+	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"models"
 )
@@ -14,7 +16,15 @@ var wikiSecret []byte = securecookie.GenerateRandomKey(32)
 var wikiUserIdCookie *securecookie.SecureCookie
 
 func wikiFrontPage(w http.ResponseWriter, r *http.Request) {
+	renderWikiFrontPage(w)
+}
 
+func renderWikiFrontPage(w http.ResponseWriter) {
+	t, _ := template.ParseFiles("templates/wiki.html")
+	if err := t.Execute(w, nil); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func wikiSignup(w http.ResponseWriter, r *http.Request) {
@@ -194,5 +204,42 @@ func wikiEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 func wikiPage(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		// get the page name in the URL
+		vars := mux.Vars(r)
+		pageVar := vars["page"]
+		
+		// fetch the page
+		// if the page does not exist redirect to the new page form
+		if page, err := models.GetPage(r, pageVar); err != nil {
+			renderNewPageForm(w, "")
+		} else {
+			renderPageView(w, *page)
+		}
+	}
+	if r.Method == "POST" {
+		// create new page 
+		
+		// add it to the cache
+		
+		// redirect to the wiki front page
+		http.Redirect(w, r, "/wiki", http.StatusFound)
+		return
+	}
+}
 
+func renderNewPageForm(w http.ResponseWriter, data interface{}) {
+	t, _ := template.ParseFiles("templates/newpage.html")
+	if err := t.Execute(w, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func renderPageView(w http.ResponseWriter, page models.Page) {
+	t, _ := template.ParseFiles("templates/page.html")
+	if err := t.Execute(w, page); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
