@@ -26,8 +26,7 @@ func init() {
 	r.HandleFunc("/wiki/signup", wikiSignup)
 	r.HandleFunc("/wiki/login", wikiLogin)
 	r.HandleFunc("/wiki/logout", wikiLogout)
-	r.HandleFunc("/wiki/_history", wikiHistory)
-	r.HandleFunc("/wiki/_edit", wikiEdit)
+	r.HandleFunc("/wiki/_edit/{page:[a-zA-Z0-9_-]+}", wikiEdit)
 	r.HandleFunc("/wiki/{page:[a-zA-Z0-9_-]+}", wikiPage)
 	http.Handle("/", r)
 }

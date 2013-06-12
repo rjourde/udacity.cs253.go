@@ -195,32 +195,55 @@ func wikiLogout(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
-func wikiHistory(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func wikiEdit(w http.ResponseWriter, r *http.Request) {
-
+	// get the page name in the URL
+	vars := mux.Vars(r)
+	pageName := vars["page"]
+	
+	if r.Method == "GET" {
+		// fetch the page
+		// if the page does not exist redirect to the wiki front page
+		if page, err := models.GetPage(r, pageName); err != nil {
+			http.Redirect(w, r, "/wiki", http.StatusFound)
+			return
+		} else {
+			renderNewPageForm(w, page.Content)
+		}
+	}
+	if r.Method == "POST" {
+		content := r.FormValue("content")
+		
+		// update page
+		models.UpdatePage(r, pageName, content)
+		
+		// redirect to the wiki front page
+		http.Redirect(w, r, "/wiki", http.StatusFound)
+		return
+	}
 }
 
 func wikiPage(w http.ResponseWriter, r *http.Request) {
+	// get the page name in the URL
+	vars := mux.Vars(r)
+	pageName := vars["page"]
+	
 	if r.Method == "GET" {
-		// get the page name in the URL
-		vars := mux.Vars(r)
-		pageVar := vars["page"]
-		
 		// fetch the page
 		// if the page does not exist redirect to the new page form
-		if page, err := models.GetPage(r, pageVar); err != nil {
-			renderNewPageForm(w, "")
+		if page, err := models.GetPage(r, pageName); err != nil {
+			renderNewPageForm(w, nil)
 		} else {
 			renderPageView(w, *page)
 		}
 	}
 	if r.Method == "POST" {
-		// create new page 
+		content := r.FormValue("content")
 		
-		// add it to the cache
+		err := models.AddPage(r, pageName, content)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		
 		// redirect to the wiki front page
 		http.Redirect(w, r, "/wiki", http.StatusFound)
