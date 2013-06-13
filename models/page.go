@@ -30,21 +30,10 @@ func AddPage(r *http.Request, name string, content string) error {
 	if err != nil {
 		return err;
 	}
-	// Encode page
-	encodedPage, _ := json.Marshal(page)
-	// Create an Item
-	item := &memcache.Item{
-		Key:   fmt.Sprintf("page%d", page.Id),
-		Value: encodedPage,
-	}
 	// Add the item to the memcache
-	if err := memcache.Set(c, item); err == memcache.ErrNotStored {
-		return err
-	} else if err != nil {
-		return err
-	}
+	err := cache(r, page);
 	
-	return nil;
+	return err;
 }
 
 func GetPage(r *http.Request, name string) (*Page, error) {
@@ -71,5 +60,25 @@ func GetPage(r *http.Request, name string) (*Page, error) {
 }
 
 func UpdatePage(r *http.Request, name string, content string) error {
-	return nil
+	// update the datastore
+	
+	page := Page{ 0, name, content, time.Now() }
+	
+	// update memcache
+	err := cache(r, page);
+
+	return err
+}
+
+func cache(r *http.Request, page Page) error {
+	// Create an Item
+	item := &memcache.Item{
+		Key:   fmt.Sprintf("page%d", page.Name),
+		Value: json.Marshal(page),
+	}
+	// Set the item to the memcache
+	c := appengine.NewContext(r)
+	err := memcache.Set(c, item)
+	
+	return err
 }

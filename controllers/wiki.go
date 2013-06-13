@@ -212,13 +212,17 @@ func wikiEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" {
 		content := r.FormValue("content")
-		
-		// update page
-		models.UpdatePage(r, pageName, content)
-		
-		// redirect to the wiki front page
-		http.Redirect(w, r, "/wiki", http.StatusFound)
-		return
+		// if the page does not exist redirect to the new page form
+		if page, err := models.GetPage(r, pageName); err != nil {
+			renderNewPageForm(w, nil)
+		} else {
+			// update page
+			models.UpdatePage(r, pageName, content)
+			
+			// redirect to the wiki page
+			http.Redirect(w, r, "/wiki/" + pageName, http.StatusFound)
+			return
+		}
 	}
 }
 
