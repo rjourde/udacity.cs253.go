@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"strconv"
 	"models"
+	"tools"
 )
 
 var secret []byte = securecookie.GenerateRandomKey(32)
@@ -111,8 +112,10 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 			} else {
 				c := appengine.NewContext(r)
 				
-				u := models.User{ username, password, verify, email, time.Now() }
-				key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "User", nil), &u)
+				userID, _, _ := datastore.AllocateIDs(c, "User", nil, 1)
+				key := datastore.NewKey(c, "WikiUser", "", userID, nil)
+				u := models.User{ userID, username, password, verify, email, time.Now() }
+				_, err := datastore.Put(c, key, &u)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -121,7 +124,7 @@ func unit4Signup(w http.ResponseWriter, r *http.Request) {
 				userIdCookie = securecookie.New(secret, nil)
 				
 				stringID := fmt.Sprintf("%d", key.IntID())
-				storeCookie(w, r, "user_id", stringID)
+				tools.StoreCookie(w, r, userIdCookie, "user_id", stringID)
 				
 				// redirect to the page of the newly registered user
 				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
@@ -149,14 +152,14 @@ func unit4Login(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		
 		// Validate form fields
-		userID, user := models.UserByUsernameAndPassword(r, username, password)
-		if(userID != 0 && len(user.Username) > 0) {
+		user := models.UserByUsernameAndPassword(r, username, password)
+		if(len(user.Username) > 0) {
 			if(username == user.Username && password == user.Password) {
 				if(userIdCookie == nil){
 					userIdCookie = securecookie.New(secret, nil)
 				}
-				stringID := fmt.Sprintf("%d", userID)
-				storeCookie(w, r, "user_id", stringID)
+				stringID := fmt.Sprintf("%d", user.Id)
+				tools.StoreCookie(w, r, userIdCookie, "user_id", stringID)
 				
 				// redirect to the welcome page
 				http.Redirect(w, r, "/unit4/welcome", http.StatusFound)
@@ -179,7 +182,7 @@ func unit4Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func unit4Logout(w http.ResponseWriter, r *http.Request) {
-	clearCookie(w, "user_id")
+	tools.ClearCookie(w, "user_id")
 	// redirect to the signup
 	http.Redirect(w, r, "/unit4/signup", http.StatusFound)
 	return
@@ -188,7 +191,7 @@ func unit4Logout(w http.ResponseWriter, r *http.Request) {
 func unit4Welcome(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	// read the secure cookie
-	if userId := fetchCookie(r, "user_id"); len(userId) > 0 {
+	if userId := tools.FetchCookie(r, userIdCookie, "user_id"); len(userId) > 0 {
 		var user models.User
 		intID, _ := strconv.ParseInt(userId, 10, 64)
 		key := datastore.NewKey(c, "User", "", intID, nil)
@@ -208,45 +211,6 @@ func unit4Welcome(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/unit4/signup", http.StatusFound)
 		return
 	}
-}
-
-// Cookie util methods
-
-func storeCookie(w http.ResponseWriter, r *http.Request, cookieName, cookieValue string) {
-	value := map[string]string{
-		cookieName : cookieValue,
-	}
-	if encoded, err := userIdCookie.Encode(cookieName, value); err == nil {
-		cookie := &http.Cookie{
-			Name:  cookieName,
-			Value: encoded,
-			Path:  "/",
-		}
-		http.SetCookie(w, cookie)
-	}
-}
-
-func fetchCookie(r *http.Request, cookieName string) string {
-	if cookie, err := r.Cookie(cookieName); err == nil {
-		value := make(map[string]string)
-		if(userIdCookie != nil) {
-			err = userIdCookie.Decode(cookieName, cookie.Value, &value)
-			if (len(value[cookieName]) > 0 && err == nil) {
-				return value[cookieName]
-			}
-		}
-	}
-
-	return ""
-}
-
-func clearCookie(w http.ResponseWriter, cookieName string) {
-	cookie := &http.Cookie{
-		Name:  cookieName,
-		Value: "",
-		Path:  "/",
-	}
-	http.SetCookie(w, cookie)
 }
 
 

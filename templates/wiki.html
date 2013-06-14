@@ -1,3 +1,4 @@
+{{define "tmpl_wiki"}}
 <!DOCTYPE html>
 <html>
 	<head>
@@ -5,15 +6,11 @@
 		<link type="text/css" rel="stylesheet" href="/static/stylesheets/main.css" />
 	</head>
 	<body>
-		<div id="content">
-			<br>
-			<div class="wiki-title">
-				Welcome to the Final!
-			</div>
-			<br><br>
-			<div class="wiki-content">
-				Your task is to build a wiki.
-			</div>
+		<a href="/wiki" class="main-title">Welcome to the Final!</a>
+		{{template "tmpl_navigation" .}}
+		<div class="wiki-content" id="content">
+			Your task is to build a wiki.
 		</div>
 	</body>
-	</html>
+</html>
+{{end}}

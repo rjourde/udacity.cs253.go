@@ -10,21 +10,21 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/securecookie"
 	"models"
+	"tools"
 )
 
 var wikiSecret []byte = securecookie.GenerateRandomKey(32)
 var wikiUserIdCookie *securecookie.SecureCookie
 
-func wikiFrontPage(w http.ResponseWriter, r *http.Request) {
-	renderWikiFrontPage(w)
+var currentUser *models.User
+
+type NavItem struct {
+	URL string
+	Name string
 }
 
-func renderWikiFrontPage(w http.ResponseWriter) {
-	t, _ := template.ParseFiles("templates/wiki.html")
-	if err := t.Execute(w, nil); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+func wikiFrontPage(w http.ResponseWriter, r *http.Request) {
+	renderWikiFrontPage(w)
 }
 
 func wikiSignup(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +94,7 @@ func wikiSignup(w http.ResponseWriter, r *http.Request) {
 			writeForm(w, form)	
 		} else {
 			user := models.UserByUsername(r, username)
-			
+
 			if(len(user.Username) > 0) {
 				errorUsername = "That user already exists"
 				
@@ -122,8 +122,10 @@ func wikiSignup(w http.ResponseWriter, r *http.Request) {
 			} else {
 				c := appengine.NewContext(r)
 				
-				u := models.User{ username, password, verify, email, time.Now() }
-				key, err := datastore.Put(c, datastore.NewIncompleteKey(c, "WikiUser", nil), &u)
+				userID, _, _ := datastore.AllocateIDs(c, "User", nil, 1)
+				key := datastore.NewKey(c, "User", "", userID, nil)
+				u := models.User{ userID, username, password, verify, email, time.Now() }
+				_, err := datastore.Put(c, key, &u)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
@@ -131,9 +133,10 @@ func wikiSignup(w http.ResponseWriter, r *http.Request) {
 	
 				wikiUserIdCookie = securecookie.New(wikiSecret, nil)
 				
-				stringID := fmt.Sprintf("%d", key.IntID())
-				storeCookie(w, r, "user_id", stringID)
-				
+				stringID := fmt.Sprintf("%d", u.Id)
+				tools.StoreCookie(w, r, wikiUserIdCookie, "user_id", stringID)
+				// set the current user
+				currentUser = &u
 				// redirect to the wiki front page
 				http.Redirect(w, r, "/wiki", http.StatusFound)
 				return
@@ -159,14 +162,17 @@ func wikiLogin(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		
 		// Validate form fields
-		userID, user := models.UserByUsernameAndPassword(r, username, password)
-		if(userID != 0 && len(user.Username) > 0) {
+		user := models.UserByUsernameAndPassword(r, username, password)
+		if(len(user.Username) > 0) {
 			if(username == user.Username && password == user.Password) {
 				if(wikiUserIdCookie == nil){
 					wikiUserIdCookie = securecookie.New(wikiSecret, nil)
 				}
-				stringID := fmt.Sprintf("%d", userID)
-				storeCookie(w, r, "user_id", stringID)
+				stringID := fmt.Sprintf("%d", user.Id)
+				tools.StoreCookie(w, r, wikiUserIdCookie, "user_id", stringID)
+				
+				// set the current user
+				currentUser = user
 				
 				// redirect to the wiki front page
 				http.Redirect(w, r, "/wiki", http.StatusFound)
@@ -189,7 +195,9 @@ func wikiLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func wikiLogout(w http.ResponseWriter, r *http.Request) {
-	clearCookie(w, "user_id")
+	tools.ClearCookie(w, "user_id")
+	// clear the current user
+	currentUser = nil
 	// redirect to the wiki front page
 	http.Redirect(w, r, "/wiki", http.StatusFound)
 	return
@@ -201,13 +209,20 @@ func wikiEdit(w http.ResponseWriter, r *http.Request) {
 	pageName := vars["page"]
 	
 	if r.Method == "GET" {
-		// fetch the page
-		// if the page does not exist redirect to the wiki front page
-		if page, err := models.GetPage(r, pageName); err != nil {
-			http.Redirect(w, r, "/wiki", http.StatusFound)
-			return
+		// fetch the page only if you are already looged in
+		if(currentUser != nil) {
+			// if the page does not exist redirect to new page form
+			if page, err := models.GetPage(r, pageName); err != nil {
+				// redirect to the wiki page
+				http.Redirect(w, r, "/wiki/" + pageName, http.StatusFound)
+				return
+			} else {
+				renderNewPageForm(w, page.Content)
+			}
 		} else {
-			renderNewPageForm(w, page.Content)
+			// redirect to the login page
+			http.Redirect(w, r, "/wiki/login", http.StatusFound)
+			return
 		}
 	}
 	if r.Method == "POST" {
@@ -217,7 +232,7 @@ func wikiEdit(w http.ResponseWriter, r *http.Request) {
 			renderNewPageForm(w, nil)
 		} else {
 			// update page
-			models.UpdatePage(r, pageName, content)
+			models.UpdatePage(r, *page, pageName, content)
 			
 			// redirect to the wiki page
 			http.Redirect(w, r, "/wiki/" + pageName, http.StatusFound)
@@ -255,6 +270,35 @@ func wikiPage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func authenticationItems() []NavItem {
+	if currentUser != nil {
+		return []NavItem{ {URL: "/wiki/logout", Name: "logout(" + currentUser.Username + ")" } }
+	} 
+	
+	return []NavItem{ {URL: "/wiki/signup", Name: "signup" },
+					  {URL: "/wiki/login", Name: "login"} }
+}
+
+func navigationItems(pageURL string) []NavItem {
+	if currentUser != nil {
+		return []NavItem{ {URL: "/wiki/logout", Name: "logout(" + currentUser.Username + ")" },
+						  {URL: "/wiki/_edit/" + pageURL, Name: "edit"} }
+	} 
+
+	return []NavItem{ {URL: "/wiki/login", Name: "login"},
+					  {URL: "/wiki/signup", Name: "signup" } }
+}
+
+func renderWikiFrontPage(w http.ResponseWriter) {
+	t, _ := template.ParseFiles("templates/navigation.html", "templates/wiki.html")
+
+	
+	if err := t.ExecuteTemplate(w, "tmpl_wiki", authenticationItems()); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func renderNewPageForm(w http.ResponseWriter, data interface{}) {
 	t, _ := template.ParseFiles("templates/newpage.html")
 	if err := t.Execute(w, data); err != nil {
@@ -264,8 +308,17 @@ func renderNewPageForm(w http.ResponseWriter, data interface{}) {
 }
 
 func renderPageView(w http.ResponseWriter, page models.Page) {
-	t, _ := template.ParseFiles("templates/page.html")
-	if err := t.Execute(w, page); err != nil {
+	t, _ := template.ParseFiles("templates/navigation.html", "templates/page.html")
+	
+	article := struct {
+		Navigation []NavItem
+		Page models.Page
+	}{
+		navigationItems(page.Name),
+		page,
+	}
+	
+	if err := t.ExecuteTemplate(w, "tmpl_page", article); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

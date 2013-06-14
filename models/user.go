@@ -8,6 +8,7 @@ import (
 )
 
 type User struct {
+	Id int64
 	Username string
 	Password string
 	Verify string 
@@ -31,19 +32,16 @@ func UserByUsername(r *http.Request, username string) User {
 	return user
 }
 
-
-func UserByUsernameAndPassword(r *http.Request, username, password string) (int64, *User) {
+func UserByUsernameAndPassword(r *http.Request, username, password string) *User {
 	var users []*User
 
 	c := appengine.NewContext(r)
 	// Fetch the user
 	q:= datastore.NewQuery("User").Filter("Username =", username).Filter("Password =", password)
-	keys, err := q.GetAll(c, &users)
-	if err != nil {
-		return 0, nil
+	_, err := q.GetAll(c, &users)
+	if err != nil || users == nil {
+		return nil
 	}
-	if(keys == nil || users == nil) {
-		return 0, nil
-	}
-	return keys[0].IntID(), users[0]
+	
+	return users[0]
 }

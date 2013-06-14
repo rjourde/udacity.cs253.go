@@ -8,7 +8,6 @@ import (
 	"appengine/datastore"
 	"encoding/json"
 	"appengine/memcache"
-	"fmt"
 )
 
 type Page struct {
@@ -31,18 +30,20 @@ func AddPage(r *http.Request, name string, content string) error {
 		return err;
 	}
 	// Add the item to the memcache
-	err := cache(r, page);
+	err = cache(r, page);
 	
 	return err;
 }
 
 func GetPage(r *http.Request, name string) (*Page, error) {
-	var pages []*Page
+	var page *Page
 	
 	c := appengine.NewContext(r)
-	if item, err := memcache.Get(c, "page"); err == memcache.ErrCacheMiss {
+	if item, err := memcache.Get(c, "page" + name); err == memcache.ErrCacheMiss {
 		// Fetch the page
 		q:= datastore.NewQuery("Page").Filter("Name =", name)
+		
+		var pages []*Page
 		keys, err := q.GetAll(c, &pages)
 		if err != nil {
 			return nil, err
@@ -50,31 +51,43 @@ func GetPage(r *http.Request, name string) (*Page, error) {
 		if(keys == nil || pages == nil) {
 			return nil, errors.New(name + " page doesn't exit")
 		}
+		
+		page = pages[0]
 	} else{
-		if err := json.Unmarshal(item.Value, &pages); err != nil {
+		if err := json.Unmarshal(item.Value, &page); err != nil {
 			return nil, err
 		}
 	}
 	
-	return pages[0], nil
+	return page, nil
 }
 
-func UpdatePage(r *http.Request, name string, content string) error {
-	// update the datastore
+func UpdatePage(r *http.Request, page Page, name string, content string) error {
+	page.Name = name
+	page.Content = content
 	
-	page := Page{ 0, name, content, time.Now() }
+	// update the datastore
+	c := appengine.NewContext(r)
+	key := datastore.NewKey(c, "Page", "", page.Id, nil)
+	
+	_, err := datastore.Put(c, key, &page)
+	if err != nil {
+		return err;
+	}
 	
 	// update memcache
-	err := cache(r, page);
+	err = cache(r, page);
 
 	return err
 }
 
 func cache(r *http.Request, page Page) error {
 	// Create an Item
+	encodedPage, _ := json.Marshal(page)
+	
 	item := &memcache.Item{
-		Key:   fmt.Sprintf("page%d", page.Name),
-		Value: json.Marshal(page),
+		Key:   "page" + page.Name,
+		Value: encodedPage,
 	}
 	// Set the item to the memcache
 	c := appengine.NewContext(r)

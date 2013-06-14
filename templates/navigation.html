@@ -1,0 +1,7 @@
+{{define "tmpl_navigation"}}
+<ul class="wiki-navigation">
+	{{range .}}
+		<li><a href="{{.URL}}">{{.Name}}</a></li>
+	{{end}}
+</ul>
+{{end}}
