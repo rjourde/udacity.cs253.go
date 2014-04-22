@@ -19,6 +19,7 @@ func init() {
 	r.HandleFunc("/signup", unit4Signup)
 	r.HandleFunc("/login", unit4Login)
 	r.HandleFunc("/logout", unit4Logout)
+  r.HandleFunc("/googlelogin", unit4GoogleLogin)
 	r.HandleFunc("/welcome", unit4Welcome)
 	r.HandleFunc("/blog.json", jsonBlogFrontPage)
 	r.HandleFunc("/blog/{id:[0-9]+}.json", jsonBlogViewPost)

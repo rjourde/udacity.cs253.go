@@ -4,7 +4,8 @@ import (
 	"html/template"
 	"net/http"
 	"appengine"
-    "appengine/datastore"
+  "appengine/datastore"
+  "appengine/user"
 	"time"
 	"github.com/gorilla/securecookie"
 	"fmt"
@@ -179,6 +180,19 @@ func unit4Login(w http.ResponseWriter, r *http.Request) {
 		
 		writeLoginForm(w, form)
 	}
+}
+
+func unit4GoogleLogin(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-type", "text/html; charset=utf-8")
+    c := appengine.NewContext(r)
+    u := user.Current(c)
+    if u == nil {
+        url, _ := user.LoginURL(c, "/")
+        fmt.Fprintf(w, `<a href="%s">Sign in or register</a>`, url)
+        return
+    }
+    url, _ := user.LogoutURL(c, "/")
+    fmt.Fprintf(w, `Welcome, %s! (<a href="%s">sign out</a>)`, u, url)
 }
 
 func unit4Logout(w http.ResponseWriter, r *http.Request) {
